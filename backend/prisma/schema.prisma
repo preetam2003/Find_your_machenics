@@ -1,0 +1,169 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Enums
+enum Role {
+  ADMIN
+  MECHANIC
+  USER
+}
+
+enum ShopStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum VehicleType {
+  TWO_WHEELER
+  FOUR_WHEELER
+}
+
+// Models
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  password      String
+  name          String?
+  phone         String?
+  role          Role      @default(USER)
+  image         String?
+  emailVerified DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  mechanicShop MechanicShop?
+  bookings     Booking[]
+
+  @@map("users")
+}
+
+model MechanicShop {
+  id           String      @id @default(cuid())
+  name         String
+  description  String?
+  address      String
+  city         String
+  state        String
+  pincode      String
+  latitude     Float?
+  longitude    Float?
+  phone        String
+  email        String?
+  status       ShopStatus  @default(PENDING)
+  vehicleTypes VehicleType[]
+  images       String[]
+  openTime     String      @default("09:00")
+  closeTime    String      @default("18:00")
+  workingDays  String[]    @default(["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"])
+  isActive     Boolean     @default(true)
+  rejectionReason String?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  // Relations
+  ownerId   String   @unique
+  owner     User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  services  Service[]
+  bookings  Booking[]
+  categories ShopCategory[]
+
+  @@index([status])
+  @@index([city])
+  @@index([latitude, longitude])
+  @@map("mechanic_shops")
+}
+
+model Category {
+  id          String      @id @default(cuid())
+  name        String      @unique
+  description String?
+  vehicleType VehicleType
+  icon        String?
+  isActive    Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  // Relations
+  services Service[]
+  shops    ShopCategory[]
+
+  @@map("categories")
+}
+
+model ShopCategory {
+  id         String @id @default(cuid())
+  shopId     String
+  categoryId String
+
+  shop     MechanicShop @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  category Category     @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([shopId, categoryId])
+  @@map("shop_categories")
+}
+
+model Service {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  price       Float
+  duration    Int      // Duration in minutes
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  shopId     String
+  shop       MechanicShop @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  categoryId String?
+  category   Category?    @relation(fields: [categoryId], references: [id])
+  bookings   Booking[]
+
+  @@index([shopId])
+  @@map("services")
+}
+
+model Booking {
+  id          String        @id @default(cuid())
+  date        DateTime
+  timeSlot    String        // e.g., "09:00-10:00"
+  status      BookingStatus @default(PENDING)
+  totalPrice  Float
+  notes       String?
+  vehicleInfo String?       // e.g., "Honda Activa 2020"
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  // Relations
+  userId    String
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  shopId    String
+  shop      MechanicShop @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  serviceId String
+  service   Service      @relation(fields: [serviceId], references: [id])
+
+  @@index([userId])
+  @@index([shopId])
+  @@index([date])
+  @@index([status])
+  @@map("bookings")
+}
